@@ -34,6 +34,7 @@ import org.matrix.android.sdk.api.session.events.model.EventType
 import org.matrix.android.sdk.api.session.events.model.isAttachmentMessage
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.ReferencesAggregatedContent
+import org.matrix.android.sdk.api.session.room.model.RoomSummary
 import org.matrix.android.sdk.api.session.room.model.message.MessageVerificationRequestContent
 import org.matrix.android.sdk.api.session.room.send.SendState
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
@@ -48,32 +49,33 @@ import javax.inject.Inject
  * This class compute if data of an event (such has avatar, display name, ...) should be displayed, depending on the previous event in the timeline
  */
 class MessageInformationDataFactory @Inject constructor(private val session: Session,
-                                                        private val roomSummariesHolder: RoomSummariesHolder,
                                                         private val dateFormatter: VectorDateFormatter,
+                                                        private val visibilityHelper: TimelineEventVisibilityHelper,
                                                         private val vectorPreferences: VectorPreferences) {
 
     fun create(params: TimelineItemFactoryParams): MessageInformationData {
         val event = params.event
-        val nextEvent = params.nextEvent
+        val nextDisplayableEvent = params.nextDisplayableEvent
         val eventId = event.eventId
 
         val date = event.root.localDateTime()
-        val nextDate = nextEvent?.root?.localDateTime()
+        val nextDate = nextDisplayableEvent?.root?.localDateTime()
         val addDaySeparator = date.toLocalDate() != nextDate?.toLocalDate()
         val isNextMessageReceivedMoreThanOneHourAgo = nextDate?.isBefore(date.minusMinutes(60))
                 ?: false
 
         val showInformation =
-                addDaySeparator
-                        || event.senderInfo.avatarUrl != nextEvent?.senderInfo?.avatarUrl
-                        || event.senderInfo.disambiguatedDisplayName != nextEvent?.senderInfo?.disambiguatedDisplayName
-                        || nextEvent.root.getClearType() !in listOf(EventType.MESSAGE, EventType.STICKER, EventType.ENCRYPTED)
-                        || isNextMessageReceivedMoreThanOneHourAgo
-                        || isTileTypeMessage(nextEvent)
-                        || nextEvent.isEdition()
+                addDaySeparator ||
+                        event.senderInfo.avatarUrl != nextDisplayableEvent?.senderInfo?.avatarUrl ||
+                        event.senderInfo.disambiguatedDisplayName != nextDisplayableEvent?.senderInfo?.disambiguatedDisplayName ||
+                        nextDisplayableEvent.root.getClearType() !in listOf(EventType.MESSAGE, EventType.STICKER, EventType.ENCRYPTED) ||
+                        isNextMessageReceivedMoreThanOneHourAgo ||
+                        isTileTypeMessage(nextDisplayableEvent) ||
+                        nextDisplayableEvent.isEdition()
 
         val time = dateFormatter.format(event.root.originServerTs, DateFormatKind.MESSAGE_SIMPLE)
-        val e2eDecoration = getE2EDecoration(event)
+        val roomSummary = params.partialState.roomSummary
+        val e2eDecoration = getE2EDecoration(roomSummary, event)
 
         // SendState Decoration
         val isSentByMe = event.root.senderId == session.myUserId
@@ -139,13 +141,12 @@ class MessageInformationDataFactory @Inject constructor(private val session: Ses
         }
     }
 
-    private fun getE2EDecoration(event: TimelineEvent): E2EDecoration {
-        val roomSummary = roomSummariesHolder.get(event.roomId)
+    private fun getE2EDecoration(roomSummary: RoomSummary?, event: TimelineEvent): E2EDecoration {
         return if (
-                event.root.sendState == SendState.SYNCED
-                && roomSummary?.isEncrypted.orFalse()
+                event.root.sendState == SendState.SYNCED &&
+                roomSummary?.isEncrypted.orFalse() &&
                 // is user verified
-                && session.cryptoService().crossSigningService().getUserCrossSigningKeys(event.root.senderId ?: "")?.isTrusted() == true) {
+                session.cryptoService().crossSigningService().getUserCrossSigningKeys(event.root.senderId ?: "")?.isTrusted() == true) {
             val ts = roomSummary?.encryptionEventTs ?: 0
             val eventTs = event.root.originServerTs ?: 0
             if (event.isEncrypted()) {

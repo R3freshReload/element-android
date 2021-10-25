@@ -18,7 +18,7 @@ package im.vector.app.features.roomprofile.settings
 
 import android.net.Uri
 import com.airbnb.mvrx.Async
-import com.airbnb.mvrx.MvRxState
+import com.airbnb.mvrx.MavericksState
 import com.airbnb.mvrx.Uninitialized
 import im.vector.app.R
 import im.vector.app.core.resources.StringProvider
@@ -43,8 +43,10 @@ data class RoomSettingsViewState(
         val newHistoryVisibility: RoomHistoryVisibility? = null,
         val newRoomJoinRules: NewJoinRule = NewJoinRule(),
         val showSaveAction: Boolean = false,
-        val actionPermissions: ActionPermissions = ActionPermissions()
-) : MvRxState {
+        val actionPermissions: ActionPermissions = ActionPermissions(),
+        val supportsRestricted: Boolean = false,
+        val canUpgradeToRestricted: Boolean = false
+) : MavericksState {
 
     constructor(args: RoomProfileArgs) : this(roomId = args.roomId)
 

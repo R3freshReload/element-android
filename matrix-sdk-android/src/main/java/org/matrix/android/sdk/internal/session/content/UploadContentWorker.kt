@@ -63,8 +63,8 @@ private data class NewAttachmentAttributes(
  * Possible previous worker: None
  * Possible next worker    : Always [MultipleEventSendingDispatcherWorker]
  */
-internal class UploadContentWorker(val context: Context, params: WorkerParameters)
-    : SessionSafeCoroutineWorker<UploadContentWorker.Params>(context, params, Params::class.java) {
+internal class UploadContentWorker(val context: Context, params: WorkerParameters) :
+        SessionSafeCoroutineWorker<UploadContentWorker.Params>(context, params, Params::class.java) {
 
     @JsonClass(generateAdapter = true)
     internal data class Params(
@@ -81,6 +81,7 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
     @Inject lateinit var fileService: DefaultFileService
     @Inject lateinit var cancelSendTracker: CancelSendTracker
     @Inject lateinit var imageCompressor: ImageCompressor
+    @Inject lateinit var imageExitTagRemover: ImageExifTagRemover
     @Inject lateinit var videoCompressor: VideoCompressor
     @Inject lateinit var thumbnailExtractor: ThumbnailExtractor
     @Inject lateinit var localEchoRepository: LocalEchoRepository
@@ -114,7 +115,7 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
         }
 
         val attachment = params.attachment
-        val filesToDelete = mutableListOf<File>()
+        val filesToDelete = hashSetOf<File>()
 
         return try {
             val inputStream = context.contentResolver.openInputStream(attachment.queryUri)
@@ -157,10 +158,10 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
                         params.attachment.size
                 )
 
-                if (attachment.type == ContentAttachmentData.Type.IMAGE
+                if (attachment.type == ContentAttachmentData.Type.IMAGE &&
                         // Do not compress gif
-                        && attachment.mimeType != MimeTypes.Gif
-                        && params.compressBeforeSending) {
+                        attachment.mimeType != MimeTypes.Gif &&
+                        params.compressBeforeSending) {
                     notifyTracker(params) { contentUploadStateTracker.setCompressingImage(it) }
 
                     fileToUpload = imageCompressor.compress(workingFile, MAX_IMAGE_SIZE, MAX_IMAGE_SIZE)
@@ -177,10 +178,10 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
                                 }
                             }
                             .also { filesToDelete.add(it) }
-                } else if (attachment.type == ContentAttachmentData.Type.VIDEO
+                } else if (attachment.type == ContentAttachmentData.Type.VIDEO &&
                         // Do not compress gif
-                        && attachment.mimeType != MimeTypes.Gif
-                        && params.compressBeforeSending) {
+                        attachment.mimeType != MimeTypes.Gif &&
+                        params.compressBeforeSending) {
                     fileToUpload = videoCompressor.compress(workingFile, object : ProgressListener {
                         override fun onProgress(progress: Int, total: Int) {
                             notifyTracker(params) { contentUploadStateTracker.setCompressingVideo(it, progress.toFloat()) }
@@ -219,6 +220,10 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
                                     }
                                 }
                             }
+                } else if (attachment.type == ContentAttachmentData.Type.IMAGE && !params.compressBeforeSending) {
+                    fileToUpload = imageExitTagRemover.removeSensitiveJpegExifTags(workingFile)
+                            .also { filesToDelete.add(it) }
+                    newAttachmentAttributes = newAttachmentAttributes.copy(newFileSize = fileToUpload.length())
                 } else {
                     fileToUpload = workingFile
                     // Fix: OpenableColumns.SIZE may return -1 or 0
@@ -234,7 +239,7 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
                             .also { filesToDelete.add(it) }
 
                     uploadedFileEncryptedFileInfo =
-                            MXEncryptedAttachments.encrypt(fileToUpload.inputStream(), attachment.getSafeMimeType(), encryptedFile) { read, total ->
+                            MXEncryptedAttachments.encrypt(fileToUpload.inputStream(), encryptedFile) { read, total ->
                                 notifyTracker(params) {
                                     contentUploadStateTracker.setEncrypting(it, read.toLong(), total.toLong())
                                 }
@@ -291,6 +296,11 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
             filesToDelete.forEach {
                 tryOrNull { it.delete() }
             }
+
+            // Delete the temporary voice message file
+            if (params.attachment.type == ContentAttachmentData.Type.AUDIO && params.attachment.mimeType == MimeTypes.Ogg) {
+                context.contentResolver.delete(params.attachment.queryUri, null, null)
+            }
         }
     }
 
@@ -315,7 +325,7 @@ internal class UploadContentWorker(val context: Context, params: WorkerParameter
                         if (params.isEncrypted) {
                             Timber.v("Encrypt thumbnail")
                             notifyTracker(params) { contentUploadStateTracker.setEncryptingThumbnail(it) }
-                            val encryptionResult = MXEncryptedAttachments.encryptAttachment(thumbnailData.bytes.inputStream(), thumbnailData.mimeType)
+                            val encryptionResult = MXEncryptedAttachments.encryptAttachment(thumbnailData.bytes.inputStream())
                             val contentUploadResponse = fileUploader.uploadByteArray(
                                     byteArray = encryptionResult.encryptedByteArray,
                                     filename = null,

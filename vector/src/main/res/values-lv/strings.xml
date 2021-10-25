@@ -486,7 +486,7 @@ Lūdzu dod piekļuves atļauju nākamajā uznirstošajā logā, lai būtu iespē
     <string name="join">Pievienoties</string>
     <string name="preview">Piekšskatījums</string>
     <string name="reject">Noraidīt</string>
-    <string name="room_jump_to_first_unread">Pāriet uz pirmo neizlasīto ziņu.</string>
+    <string name="room_jump_to_first_unread">Pāriet uz pirmo neizlasīto ziņu</string>
     <string name="room_preview_invitation_format">%s jūs uzaicināja pievienoties šai istabai</string>
     <string name="room_preview_unlinked_email_warning">Uzaicinājums tika nosūtīts uz %s, kura nav piesaistīta šim kontam. 
 \nJūs varat pierakstīties ar citu kontu vai arī pievienot šo epastu šim kontam.</string>
@@ -545,7 +545,7 @@ Lūdzu dod piekļuves atļauju nākamajā uznirstošajā logā, lai būtu iespē
     <string name="room_resend_unsent_messages">Nosūtīt nenosūtītās ziņas</string>
     <string name="room_delete_unsent_messages">Dzēst nenosūtītās ziņas</string>
     <string name="room_message_file_not_found">Fails nav atrasts</string>
-    <string name="room_do_not_have_permission_to_post">Tev nav tiesību rakstīt ziņas šajā istabā</string>
+    <string name="room_do_not_have_permission_to_post">Tev nav tiesību rakstīt ziņas šajā istabā.</string>
     <string name="ssl_trust">Uzticēties</string>
     <string name="ssl_do_not_trust">Neuzticēties</string>
     <string name="ssl_logout_account">Izrakstīties</string>
@@ -1074,7 +1074,6 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
     <string name="attachment_type_camera">Kamera</string>
     <string name="settings_text_message_sent_hint">Kods</string>
     <string name="direct_room_user_list_known_title">Zināmie lietotāji</string>
-    <string name="user_directory_search_hint">Meklēt pēc nosaukuma vai ID</string>
     <string name="send_file_step_idle">Gaida…</string>
     <string name="bottom_action_people_x">Tiešās ziņas</string>
     <string name="send_suggestion_failed">Ieteikumu neizdevās nosūtīt (%s)</string>
@@ -1390,7 +1389,7 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
     <string name="room_tombstone_predecessor_link">Nospiediet šeit, lai redzētu vecākas ziņas</string>
     <string name="room_tombstone_continuation_description">Šī istabas ir citas sarakstes turpinājums</string>
     <string name="room_tombstone_continuation_link">Sarakste turpinās šeit</string>
-    <string name="room_tombstone_versioned_description">Šī istaba ir aizvietota un vairs nav aktīva</string>
+    <string name="room_tombstone_versioned_description">Šī istaba ir aizvietota un vairs nav aktīva.</string>
     <string name="dialog_user_consent_submit">Pārskatīt tagad</string>
     <string name="dialog_user_consent_content">Lai turpinātu izmantot %1$s bāzes serveri, jums ir jāpārskata un jāpiekrīt noteikumiem un nosacījumiem.</string>
     <string name="notification_silent">Kluss</string>
@@ -1903,18 +1902,18 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
     <string name="settings_room_directory_show_all_rooms">Rādīt istabas ar vecuma ierobežojumu</string>
     <string name="notice_room_server_acl_allow_is_empty">🎉 Visi serveri ir aizliegti piedalīties! Šo istabu vairs nevar izmantot.</string>
     <string name="notice_room_server_acl_updated_no_change">Nekas nemainīts.</string>
-    <string name="notice_room_server_acl_updated_ip_literals_not_allowed">• Servers ar vienādu IP tagad ir aizliegts.</string>
-    <string name="notice_room_server_acl_updated_ip_literals_allowed">• Servers ar vienādu IP ir atļauts.</string>
-    <string name="notice_room_server_acl_updated_was_allowed">• Servers vienāds ar %s tika noņemts no atļautā saraksta.</string>
-    <string name="notice_room_server_acl_updated_allowed">• Servers vienāds ar %s tagad ir atļauts.</string>
-    <string name="notice_room_server_acl_updated_was_banned">• Servers vienāds ar %s tika noņemts no aizliegtā saraksta.</string>
-    <string name="notice_room_server_acl_updated_banned">• Servers vienāds ar %s tagad ir aizliegts.</string>
+    <string name="notice_room_server_acl_updated_ip_literals_not_allowed">• Serveri ar atbilstošu IP tagad ir aizliegti.</string>
+    <string name="notice_room_server_acl_updated_ip_literals_allowed">• Serveri ar atbilstošu IP ir atļauti.</string>
+    <string name="notice_room_server_acl_updated_was_allowed">• Serveri, kuri atbilst %s tika izņemti no atļauto saraksta.</string>
+    <string name="notice_room_server_acl_updated_allowed">• Serveri, kuri atbilst %s tagad ir atļauti.</string>
+    <string name="notice_room_server_acl_updated_was_banned">• Serveri, kuri atbilst %s tika noņemti no aizliegto/nobanoto saraksta.</string>
+    <string name="notice_room_server_acl_updated_banned">• Serveri, kuri atbilst %s tagad ir aizliegti.</string>
     <string name="notice_room_server_acl_updated_title_by_you">Jūs nomainījāt servera ACL šai istabai.</string>
     <string name="notice_room_server_acl_updated_title">%s nomainīja servera ACL šai istabai.</string>
-    <string name="notice_room_server_acl_set_ip_literals_not_allowed">• Servers ar vienādu IP ir aizliegts.</string>
-    <string name="notice_room_server_acl_set_ip_literals_allowed">• Servers ar vienādu IP ir atļauts.</string>
-    <string name="notice_room_server_acl_set_allowed">• Servers vienāds ar %s ir atļauts.</string>
-    <string name="notice_room_server_acl_set_banned">• Servers vienāds ar %s ir aizliegts.</string>
+    <string name="notice_room_server_acl_set_ip_literals_not_allowed">• Serveri ar vienādām IP ir aizliegti.</string>
+    <string name="notice_room_server_acl_set_ip_literals_allowed">• Serveri ar vienādām IP ir atļauti.</string>
+    <string name="notice_room_server_acl_set_allowed">• Serveri, kuri atbilst %s ir atļauti.</string>
+    <string name="notice_room_server_acl_set_banned">• Serveri, kuri atbilst %s ir nobanoti.</string>
     <string name="notice_room_server_acl_set_title_by_you">Jūs iestatījāt servera ACL šai istabai.</string>
     <string name="notice_room_server_acl_set_title">%s iestatīja servera ACL šai istabai.</string>
     <string name="notice_direct_room_update_by_you">Jūs atjauninājāt šeit.</string>
@@ -2049,7 +2048,7 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
     <string name="settings_show_emoji_keyboard">Rādīt Emoji tastatūru</string>
     <string name="settings_send_message_with_enter_summary">Tastatūras Enter poga sūtīs ziņu, tā vietā lai pievienotu jaunu rindkopu</string>
     <string name="settings_send_message_with_enter">Sūtīt ziņu ar Enter</string>
-    <string name="settings_show_avatar_display_name_changes_messages_summary">Iekļauj avatāra un vārda maiņas</string>
+    <string name="settings_show_avatar_display_name_changes_messages_summary">Iekļauj avatara un parādāmā vārda izmaiņas.</string>
     <string name="settings_show_avatar_display_name_changes_messages">Rādīt konta notikumus</string>
     <string name="settings_show_join_leave_messages">Rādīt cilvēku pievienošanos vai iziešanu</string>
     <string name="settings_show_room_member_state_events_summary">Ietver uzaicinājumus/pievienošanos/aiziešanu/izmešanu/noteikumu pārkāpšanas/profila bildes izmaiņas.</string>
@@ -2214,7 +2213,7 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
     <string name="a11y_create_room">Izveidot jaunu telpu</string>
     <string name="error_terms_not_accepted">Lūdzu, mēģiniet vēlreiz, tiklīdz esat piekritis sava servera noteikumiem un nosacījumiem.</string>
     <string name="settings_discovery_disconnect_with_bound_pid">Pašlaik jūs kopīgojat e-pasta adreses vai tālruņa numurus identitātes serverī %1$s. Lai pārtrauktu to koplietošanu, jums būs jāpārveido savienojums ar %2$s.</string>
-    <string name="settings_discovery_no_terms">Jūsu izvēlētajam identitātes serverim nav pakalpojumu sniegšanas noteikumu. Turpiniet tikai tad, ja uzticaties pakalpojuma īpašniekam.</string>
+    <string name="settings_discovery_no_terms">Jūsu izvēlētajam identitātes serverim nav pakalpojumu sniegšanas noteikumu. Turpiniet tikai tad, ja uzticaties pakalpojuma īpašniekam</string>
     <string name="settings_discovery_no_terms_title">Identitātes serverim nav pakalpojumu sniegšanas noteikumu</string>
     <string name="settings_discovery_please_enter_server">Lūdzu, ievadiet identitātes servera url</string>
     <string name="settings_discovery_enter_identity_server">Ievadiet identitātes servera URL</string>
@@ -2333,4 +2332,10 @@ Nākotnē šī pārbaudes procedūra plānota sarežģītāka.</string>
         <item quantity="one">%ds</item>
         <item quantity="other">%di</item>
     </plurals>
+    <string name="missing_permissions_title">Trūkst atļauju</string>
+    <string name="denied_permission_camera">Lai veiktu šo darbību, lūdzu, piešķiriet kamerai atļauju sistēmas iestatījumos.</string>
+    <string name="denied_permission_generic">Lai veiktu šo darbību, trūkst dažu atļauju. Lūdzu, sistēmas Iestatījumos piešķiriet atļaujas.</string>
+    <string name="spaces_header">Vietnes</string>
+    <string name="spaces_invited_header">Uzaicinājumi</string>
+    <string name="suggested_header">Ieteiktās telpas</string>
 </resources>

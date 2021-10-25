@@ -47,7 +47,7 @@ import im.vector.app.features.roomprofile.settings.RoomSettingsAction
 import im.vector.app.features.roomprofile.settings.RoomSettingsViewEvents
 import im.vector.app.features.roomprofile.settings.RoomSettingsViewModel
 import im.vector.app.features.roomprofile.settings.RoomSettingsViewState
-import im.vector.app.features.roomprofile.settings.joinrule.RoomJoinRuleBottomSheet
+import im.vector.app.features.roomprofile.settings.joinrule.RoomJoinRuleActivity
 import im.vector.app.features.roomprofile.settings.joinrule.RoomJoinRuleSharedActionViewModel
 import org.matrix.android.sdk.api.session.room.model.GuestAccess
 import org.matrix.android.sdk.api.session.room.model.RoomHistoryVisibility
@@ -59,11 +59,9 @@ import javax.inject.Inject
 class SpaceSettingsFragment @Inject constructor(
         private val epoxyController: SpaceSettingsController,
         private val colorProvider: ColorProvider,
-        val viewModelFactory: RoomSettingsViewModel.Factory,
         private val avatarRenderer: AvatarRenderer,
         private val drawableProvider: DrawableProvider
 ) : VectorBaseFragment<FragmentRoomSettingGenericBinding>(),
-        RoomSettingsViewModel.Factory,
         SpaceSettingsController.Callback,
         GalleryOrCameraDialogHelper.Listener,
         OnBackPressed {
@@ -80,10 +78,6 @@ class SpaceSettingsFragment @Inject constructor(
     private val roomProfileArgs: RoomProfileArgs by args()
 
     override fun getMenuRes() = R.menu.vector_room_settings
-
-    override fun create(initialState: RoomSettingsViewState): RoomSettingsViewModel {
-        return viewModelFactory.create(initialState)
-    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -133,12 +127,6 @@ class SpaceSettingsFragment @Inject constructor(
 
         state.roomSummary()?.let {
             views.roomSettingsToolbarTitleView.text = it.displayName
-            views.roomSettingsToolbarTitleView.setCompoundDrawablesWithIntrinsicBounds(
-                    null,
-                    null,
-                    drawableProvider.getDrawable(R.drawable.ic_beta_pill),
-                    null
-            )
             avatarRenderer.render(it.toMatrixItem(), views.roomSettingsToolbarAvatarImageView)
             views.roomSettingsDecorationToolbarAvatarImageView.render(it.roomEncryptionTrustLevel)
         }
@@ -199,10 +187,8 @@ class SpaceSettingsFragment @Inject constructor(
         // N/A for space settings screen
     }
 
-    override fun onJoinRuleClicked() = withState(viewModel) { state ->
-        val currentJoinRule = state.newRoomJoinRules.newJoinRules ?: state.currentRoomJoinRules
-        RoomJoinRuleBottomSheet.newInstance(currentJoinRule)
-                .show(childFragmentManager, "RoomJoinRuleBottomSheet")
+    override fun onJoinRuleClicked() {
+        startActivity(RoomJoinRuleActivity.newIntent(requireContext(), roomProfileArgs.roomId))
     }
 
     override fun onToggleGuestAccess() = withState(viewModel) { state ->
@@ -235,6 +221,10 @@ class SpaceSettingsFragment @Inject constructor(
 
     override fun onRoomAliasesClicked() {
         sharedViewModel.handle(SpaceManagedSharedAction.OpenSpaceAliasesSettings)
+    }
+
+    override fun onRoomPermissionsClicked() {
+        sharedViewModel.handle(SpaceManagedSharedAction.OpenSpacePermissionSettings)
     }
 
     override fun onImageReady(uri: Uri?) {

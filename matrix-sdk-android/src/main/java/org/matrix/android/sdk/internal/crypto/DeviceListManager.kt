@@ -16,7 +16,9 @@
 
 package org.matrix.android.sdk.internal.crypto
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.matrix.android.sdk.api.MatrixCoroutineDispatchers
 import org.matrix.android.sdk.api.MatrixPatterns
 import org.matrix.android.sdk.api.auth.data.Credentials
 import org.matrix.android.sdk.internal.crypto.crosssigning.DeviceTrustLevel
@@ -28,7 +30,6 @@ import org.matrix.android.sdk.internal.crypto.tasks.DownloadKeysForUsersTask
 import org.matrix.android.sdk.internal.session.SessionScope
 import org.matrix.android.sdk.internal.session.sync.SyncTokenStore
 import org.matrix.android.sdk.internal.task.TaskExecutor
-import org.matrix.android.sdk.internal.util.MatrixCoroutineDispatchers
 import org.matrix.android.sdk.internal.util.logLimit
 import timber.log.Timber
 import javax.inject.Inject
@@ -336,7 +337,12 @@ internal class DeviceListManager @Inject constructor(private val cryptoStore: IM
             downloadKeysForUsersTask.execute(params)
         } catch (throwable: Throwable) {
             Timber.e(throwable, "## CRYPTO | doKeyDownloadForUsers(): error")
-            onKeysDownloadFailed(filteredUsers)
+            if (throwable is CancellationException) {
+                // the crypto module is getting closed, so we cannot access the DB anymore
+                Timber.w("The crypto module is closed, ignoring this error")
+            } else {
+                onKeysDownloadFailed(filteredUsers)
+            }
             throw throwable
         }
         Timber.v("## CRYPTO | doKeyDownloadForUsers() : Got keys for " + filteredUsers.size + " users")
@@ -469,8 +475,8 @@ internal class DeviceListManager @Inject constructor(private val cryptoStore: IM
         }
 
         if (!isVerified) {
-            Timber.e("## CRYPTO | validateDeviceKeys() : Unable to verify signature on device " + userId + ":"
-                    + deviceKeys.deviceId + " with error " + errorMessage)
+            Timber.e("## CRYPTO | validateDeviceKeys() : Unable to verify signature on device " + userId + ":" +
+                    deviceKeys.deviceId + " with error " + errorMessage)
             return false
         }
 
@@ -480,9 +486,9 @@ internal class DeviceListManager @Inject constructor(private val cryptoStore: IM
                 // best off sticking with the original keys.
                 //
                 // Should we warn the user about it somehow?
-                Timber.e("## CRYPTO | validateDeviceKeys() : WARNING:Ed25519 key for device " + userId + ":"
-                        + deviceKeys.deviceId + " has changed : "
-                        + previouslyStoredDeviceKeys.fingerprint() + " -> " + signKey)
+                Timber.e("## CRYPTO | validateDeviceKeys() : WARNING:Ed25519 key for device " + userId + ":" +
+                        deviceKeys.deviceId + " has changed : " +
+                        previouslyStoredDeviceKeys.fingerprint() + " -> " + signKey)
 
                 Timber.e("## CRYPTO | validateDeviceKeys() : $previouslyStoredDeviceKeys -> $deviceKeys")
                 Timber.e("## CRYPTO | validateDeviceKeys() : ${previouslyStoredDeviceKeys.keys} -> ${deviceKeys.keys}")

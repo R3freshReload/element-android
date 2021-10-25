@@ -17,52 +17,84 @@
 package im.vector.app.features.roomdirectory.createroom
 
 import androidx.core.net.toFile
-import androidx.lifecycle.viewModelScope
 import com.airbnb.mvrx.Fail
-import com.airbnb.mvrx.FragmentViewModelContext
 import com.airbnb.mvrx.Loading
-import com.airbnb.mvrx.MvRxViewModelFactory
+import com.airbnb.mvrx.MavericksViewModelFactory
 import com.airbnb.mvrx.Success
 import com.airbnb.mvrx.Uninitialized
-import com.airbnb.mvrx.ViewModelContext
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import im.vector.app.core.di.MavericksAssistedViewModelFactory
+import im.vector.app.core.di.hiltMavericksViewModelFactory
 import im.vector.app.core.extensions.exhaustive
 import im.vector.app.core.platform.VectorViewModel
 import im.vector.app.features.raw.wellknown.getElementWellknown
 import im.vector.app.features.raw.wellknown.isE2EByDefault
+import im.vector.app.features.settings.VectorPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.matrix.android.sdk.api.MatrixPatterns.getDomain
+import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.extensions.tryOrNull
 import org.matrix.android.sdk.api.raw.RawService
 import org.matrix.android.sdk.api.session.Session
+import org.matrix.android.sdk.api.session.homeserver.HomeServerCapabilities
 import org.matrix.android.sdk.api.session.room.alias.RoomAliasError
 import org.matrix.android.sdk.api.session.room.failure.CreateRoomFailure
+import org.matrix.android.sdk.api.session.room.model.PowerLevelsContent
 import org.matrix.android.sdk.api.session.room.model.RoomDirectoryVisibility
+import org.matrix.android.sdk.api.session.room.model.RoomJoinRules
+import org.matrix.android.sdk.api.session.room.model.RoomJoinRulesAllowEntry
+import org.matrix.android.sdk.api.session.room.model.RoomType
 import org.matrix.android.sdk.api.session.room.model.create.CreateRoomParams
 import org.matrix.android.sdk.api.session.room.model.create.CreateRoomPreset
+import org.matrix.android.sdk.api.session.room.model.create.RestrictedRoomPreset
 import timber.log.Timber
 
 class CreateRoomViewModel @AssistedInject constructor(@Assisted private val initialState: CreateRoomViewState,
                                                       private val session: Session,
-                                                      private val rawService: RawService
+                                                      private val rawService: RawService,
+                                                      vectorPreferences: VectorPreferences
 ) : VectorViewModel<CreateRoomViewState, CreateRoomAction, CreateRoomViewEvents>(initialState) {
 
     @AssistedFactory
-    interface Factory {
-        fun create(initialState: CreateRoomViewState): CreateRoomViewModel
+    interface Factory : MavericksAssistedViewModelFactory<CreateRoomViewModel, CreateRoomViewState> {
+        override fun create(initialState: CreateRoomViewState): CreateRoomViewModel
     }
+
+    companion object : MavericksViewModelFactory<CreateRoomViewModel, CreateRoomViewState> by hiltMavericksViewModelFactory()
 
     init {
         initHomeServerName()
         initAdminE2eByDefault()
+
+        val restrictedSupport = session.getHomeServerCapabilities().isFeatureSupported(HomeServerCapabilities.ROOM_CAP_RESTRICTED)
+        val createRestricted = when (restrictedSupport) {
+            HomeServerCapabilities.RoomCapabilitySupport.SUPPORTED          -> true
+            HomeServerCapabilities.RoomCapabilitySupport.SUPPORTED_UNSTABLE -> vectorPreferences.labsUseExperimentalRestricted()
+            else                                                            -> false
+        }
+
+        val defaultJoinRules = if (initialState.parentSpaceId != null && createRestricted) {
+            RoomJoinRules.RESTRICTED
+        } else {
+            RoomJoinRules.INVITE
+        }
+
+        setState {
+            copy(
+                    supportsRestricted = createRestricted,
+                    roomJoinRules = defaultJoinRules,
+                    parentSpaceSummary = initialState.parentSpaceId?.let { session.getRoomSummary(it) }
+            )
+        }
     }
 
     private fun initHomeServerName() {
         setState {
             copy(
-                    homeServerName = session.myUserId.substringAfter(":")
+                    homeServerName = session.myUserId.getDomain()
             )
         }
     }
@@ -72,27 +104,22 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
     private fun initAdminE2eByDefault() {
         viewModelScope.launch(Dispatchers.IO) {
             adminE2EByDefault = tryOrNull {
-                rawService.getElementWellknown(session.myUserId)
+                rawService.getElementWellknown(session.sessionParams)
                         ?.isE2EByDefault()
                         ?: true
             } ?: true
 
             setState {
                 copy(
-                        isEncrypted = roomVisibilityType is CreateRoomViewState.RoomVisibilityType.Private && adminE2EByDefault,
-                        hsAdminHasDisabledE2E = !adminE2EByDefault
+                        hsAdminHasDisabledE2E = !adminE2EByDefault,
+                        defaultEncrypted = mapOf(
+                                RoomJoinRules.INVITE to adminE2EByDefault,
+                                RoomJoinRules.PUBLIC to false,
+                                RoomJoinRules.RESTRICTED to adminE2EByDefault
+                        )
+
                 )
             }
-        }
-    }
-
-    companion object : MvRxViewModelFactory<CreateRoomViewModel, CreateRoomViewState> {
-
-        @JvmStatic
-        override fun create(viewModelContext: ViewModelContext, state: CreateRoomViewState): CreateRoomViewModel? {
-            val fragment: CreateRoomFragment = (viewModelContext as FragmentViewModelContext).fragment()
-
-            return fragment.createRoomViewModelFactory.create(state)
         }
     }
 
@@ -101,7 +128,7 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
             is CreateRoomAction.SetAvatar             -> setAvatar(action)
             is CreateRoomAction.SetName               -> setName(action)
             is CreateRoomAction.SetTopic              -> setTopic(action)
-            is CreateRoomAction.SetIsPublic           -> setIsPublic(action)
+            is CreateRoomAction.SetVisibility         -> setVisibility(action)
             is CreateRoomAction.SetRoomAliasLocalPart -> setRoomAliasLocalPart(action)
             is CreateRoomAction.SetIsEncrypted        -> setIsEncrypted(action)
             is CreateRoomAction.Create                -> doCreateRoom()
@@ -148,35 +175,45 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
 
     private fun setTopic(action: CreateRoomAction.SetTopic) = setState { copy(roomTopic = action.topic) }
 
-    private fun setIsPublic(action: CreateRoomAction.SetIsPublic) = setState {
-        if (action.isPublic) {
-            copy(
-                    roomVisibilityType = CreateRoomViewState.RoomVisibilityType.Public(""),
-                    // Reset any error in the form about alias
-                    asyncCreateRoomRequest = Uninitialized,
-                    isEncrypted = false
-            )
-        } else {
-            copy(
-                    roomVisibilityType = CreateRoomViewState.RoomVisibilityType.Private,
-                    isEncrypted = adminE2EByDefault
-            )
+    private fun setVisibility(action: CreateRoomAction.SetVisibility) = setState {
+        when (action.rule) {
+            RoomJoinRules.PUBLIC     -> {
+                copy(
+                        roomJoinRules = RoomJoinRules.PUBLIC,
+                        // Reset any error in the form about alias
+                        asyncCreateRoomRequest = Uninitialized,
+                        isEncrypted = false
+                )
+            }
+            RoomJoinRules.RESTRICTED -> {
+                copy(
+                        roomJoinRules = RoomJoinRules.RESTRICTED,
+                        // Reset any error in the form about alias
+                        asyncCreateRoomRequest = Uninitialized,
+                        isEncrypted = adminE2EByDefault
+                )
+            }
+//            RoomJoinRules.INVITE,
+//            RoomJoinRules.KNOCK,
+//            RoomJoinRules.PRIVATE,
+            else                     -> {
+                // default to invite
+                copy(
+                        roomJoinRules = RoomJoinRules.INVITE,
+                        isEncrypted = adminE2EByDefault
+                )
+            }
         }
     }
 
     private fun setRoomAliasLocalPart(action: CreateRoomAction.SetRoomAliasLocalPart) {
-        withState { state ->
-            if (state.roomVisibilityType is CreateRoomViewState.RoomVisibilityType.Public) {
-                setState {
-                    copy(
-                            roomVisibilityType = CreateRoomViewState.RoomVisibilityType.Public(action.aliasLocalPart),
-                            // Reset any error in the form about alias
-                            asyncCreateRoomRequest = Uninitialized
-                    )
-                }
-            }
+        setState {
+            copy(
+                    aliasLocalPart = action.aliasLocalPart,
+                    // Reset any error in the form about alias
+                    asyncCreateRoomRequest = Uninitialized
+            )
         }
-        // Else ignore
     }
 
     private fun setIsEncrypted(action: CreateRoomAction.SetIsEncrypted) = setState { copy(isEncrypted = action.isEncrypted) }
@@ -186,8 +223,7 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
             return@withState
         }
 
-        if (state.roomVisibilityType is CreateRoomViewState.RoomVisibilityType.Public
-                && state.roomVisibilityType.aliasLocalPart.isBlank()) {
+        if (state.roomJoinRules == RoomJoinRules.PUBLIC && state.aliasLocalPart.isNullOrBlank()) {
             // we require an alias for public rooms
             setState {
                 copy(asyncCreateRoomRequest = Fail(CreateRoomFailure.AliasError(RoomAliasError.AliasIsBlank)))
@@ -204,15 +240,39 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
                     name = state.roomName.takeIf { it.isNotBlank() }
                     topic = state.roomTopic.takeIf { it.isNotBlank() }
                     avatarUri = state.avatarUri
-                    when (state.roomVisibilityType) {
-                        is CreateRoomViewState.RoomVisibilityType.Public  -> {
+
+                    if (state.isSubSpace) {
+                        // Space-rooms are distinguished from regular messaging rooms by the m.room.type of m.space
+                        roomType = RoomType.SPACE
+
+                        // Space-rooms should be created with a power level for events_default of 100,
+                        // to prevent the rooms accidentally/maliciously clogging up with messages from random members of the space.
+                        powerLevelContentOverride = PowerLevelsContent(
+                                eventsDefault = 100
+                        )
+                    }
+
+                    when (state.roomJoinRules) {
+                        RoomJoinRules.PUBLIC     -> {
                             // Directory visibility
                             visibility = RoomDirectoryVisibility.PUBLIC
                             // Preset
                             preset = CreateRoomPreset.PRESET_PUBLIC_CHAT
-                            roomAliasName = state.roomVisibilityType.aliasLocalPart
+                            roomAliasName = state.aliasLocalPart
                         }
-                        is CreateRoomViewState.RoomVisibilityType.Private -> {
+                        RoomJoinRules.RESTRICTED -> {
+                            state.parentSpaceId?.let {
+                                featurePreset = RestrictedRoomPreset(
+                                        session.getHomeServerCapabilities(),
+                                        listOf(RoomJoinRulesAllowEntry.restrictedToRoom(state.parentSpaceId))
+                                )
+                            }
+                        }
+//                        RoomJoinRules.KNOCK      ->
+//                        RoomJoinRules.PRIVATE    ->
+//                        RoomJoinRules.INVITE
+                        else                     -> {
+                            // by default create invite only
                             // Directory visibility
                             visibility = RoomDirectoryVisibility.PRIVATE
                             // Preset
@@ -223,7 +283,12 @@ class CreateRoomViewModel @AssistedInject constructor(@Assisted private val init
                     disableFederation = state.disableFederation
 
                     // Encryption
-                    if (state.isEncrypted) {
+                    val shouldEncrypt = when (state.roomJoinRules) {
+                        // we ignore the isEncrypted for public room as the switch is hidden in this case
+                        RoomJoinRules.PUBLIC -> false
+                        else                 -> state.isEncrypted ?: state.defaultEncrypted[state.roomJoinRules].orFalse()
+                    }
+                    if (shouldEncrypt) {
                         enableEncryption()
                     }
                 }

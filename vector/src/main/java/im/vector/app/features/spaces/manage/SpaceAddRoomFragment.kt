@@ -27,6 +27,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.airbnb.mvrx.Loading
 import com.airbnb.mvrx.activityViewModel
 import com.airbnb.mvrx.fragmentViewModel
+import com.airbnb.mvrx.withState
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jakewharton.rxbinding3.appcompat.queryTextChanges
 import im.vector.app.R
@@ -43,9 +44,8 @@ class SpaceAddRoomFragment @Inject constructor(
         private val spaceEpoxyController: AddRoomListController,
         private val roomEpoxyController: AddRoomListController,
         private val dmEpoxyController: AddRoomListController,
-        private val viewModelFactory: SpaceAddRoomsViewModel.Factory
 ) : VectorBaseFragment<FragmentSpaceAddRoomsBinding>(),
-        OnBackPressed, AddRoomListController.Listener, SpaceAddRoomsViewModel.Factory {
+        OnBackPressed, AddRoomListController.Listener {
 
     override fun getBinding(inflater: LayoutInflater, container: ViewGroup?) =
             FragmentSpaceAddRoomsBinding.inflate(layoutInflater, container, false)
@@ -53,9 +53,6 @@ class SpaceAddRoomFragment @Inject constructor(
     private val viewModel by fragmentViewModel(SpaceAddRoomsViewModel::class)
 
     private val sharedViewModel: SpaceManageSharedViewModel by activityViewModel()
-
-    override fun create(initialState: SpaceAddRoomsState): SpaceAddRoomsViewModel =
-            viewModelFactory.create(initialState)
 
     override fun getMenuRes(): Int = R.menu.menu_space_add_room
 
@@ -90,30 +87,44 @@ class SpaceAddRoomFragment @Inject constructor(
             invalidateOptionsMenu()
         }
 
-        viewModel.selectSubscribe(this, SpaceAddRoomsState::spaceName) {
+        viewModel.onEach(SpaceAddRoomsState::spaceName) {
             views.appBarSpaceInfo.text = it
-        }.disposeOnDestroyView()
+        }
 
-        viewModel.selectSubscribe(this, SpaceAddRoomsState::ignoreRooms) {
+        viewModel.onEach(SpaceAddRoomsState::ignoreRooms) {
             spaceEpoxyController.ignoreRooms = it
             roomEpoxyController.ignoreRooms = it
             dmEpoxyController.ignoreRooms = it
-        }.disposeOnDestroyView()
+        }
 
-        viewModel.selectSubscribe(this, SpaceAddRoomsState::isSaving) {
+        viewModel.onEach(SpaceAddRoomsState::isSaving) {
             if (it is Loading) {
                 sharedViewModel.handle(SpaceManagedSharedAction.ShowLoading)
             } else {
                 sharedViewModel.handle(SpaceManagedSharedAction.HideLoading)
             }
-        }.disposeOnDestroyView()
+        }
 
-        viewModel.selectSubscribe(this, SpaceAddRoomsState::shouldShowDMs) {
-           dmEpoxyController.disabled = !it
-        }.disposeOnDestroyView()
+        viewModel.onEach(SpaceAddRoomsState::shouldShowDMs) {
+            dmEpoxyController.disabled = !it
+        }
+
+        viewModel.onEach(SpaceAddRoomsState::onlyShowSpaces) {
+            spaceEpoxyController.disabled = !it
+            roomEpoxyController.disabled = it
+            views.createNewRoom.text = if (it) getString(R.string.create_space) else getString(R.string.create_new_room)
+            val title = if (it) getString(R.string.space_add_existing_spaces) else getString(R.string.space_add_existing_rooms_only)
+            views.appBarTitle.text = title
+        }
 
         views.createNewRoom.debouncedClicks {
-            sharedViewModel.handle(SpaceManagedSharedAction.CreateRoom)
+            withState(viewModel) { state ->
+                if (state.onlyShowSpaces) {
+                    sharedViewModel.handle(SpaceManagedSharedAction.CreateSpace)
+                } else {
+                    sharedViewModel.handle(SpaceManagedSharedAction.CreateRoom)
+                }
+            }
         }
 
         viewModel.observeViewEvents {

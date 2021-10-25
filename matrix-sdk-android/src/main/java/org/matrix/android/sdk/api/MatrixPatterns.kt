@@ -16,8 +16,14 @@
 
 package org.matrix.android.sdk.api
 
+import org.matrix.android.sdk.BuildConfig
+import org.matrix.android.sdk.internal.util.removeInvalidRoomNameChars
+import org.matrix.android.sdk.internal.util.replaceSpaceChars
+import timber.log.Timber
+
 /**
  * This class contains pattern to match the different Matrix ids
+ * Ref: https://matrix.org/docs/spec/appendices#identifier-grammar
  */
 object MatrixPatterns {
 
@@ -25,7 +31,7 @@ object MatrixPatterns {
     private const val DOMAIN_REGEX = ":[A-Z0-9.-]+(:[0-9]{2,5})?"
 
     // regex pattern to find matrix user ids in a string.
-    // See https://matrix.org/speculator/spec/HEAD/appendices.html#historical-user-ids
+    // See https://matrix.org/docs/spec/appendices#historical-user-ids
     private const val MATRIX_USER_IDENTIFIER_REGEX = "@[A-Z0-9\\x21-\\x39\\x3B-\\x7F]+$DOMAIN_REGEX"
     val PATTERN_CONTAIN_MATRIX_USER_IDENTIFIER = MATRIX_USER_IDENTIFIER_REGEX.toRegex(RegexOption.IGNORE_CASE)
 
@@ -124,10 +130,10 @@ object MatrixPatterns {
      * @return true if the string is a valid event id.
      */
     fun isEventId(str: String?): Boolean {
-        return str != null
-                && (str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER
-                || str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER_V3
-                || str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER_V4)
+        return str != null &&
+                (str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER ||
+                        str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER_V3 ||
+                        str matches PATTERN_CONTAIN_MATRIX_EVENT_IDENTIFIER_V4)
     }
 
     /**
@@ -154,13 +160,28 @@ object MatrixPatterns {
      * Orders which are not strings, or do not consist solely of ascii characters in the range \x20 (space) to \x7E (~),
      * or consist of more than 50 characters, are forbidden and the field should be ignored if received.
      */
-    fun isValidOrderString(order: String?) : Boolean {
+    fun isValidOrderString(order: String?): Boolean {
         return order != null && order.length < 50 && order matches ORDER_STRING_REGEX
     }
 
-    fun candidateAliasFromRoomName(name: String): String {
-        return Regex("\\s").replace(name.lowercase(), "_").let {
-            "[^a-z0-9._%#@=+-]".toRegex().replace(it, "")
+    fun candidateAliasFromRoomName(roomName: String, domain: String): String {
+        return roomName.lowercase()
+                .replaceSpaceChars(replacement = "_")
+                .removeInvalidRoomNameChars()
+                .take(MatrixConstants.maxAliasLocalPartLength(domain))
+    }
+
+    /**
+     * Return the domain form a userId
+     * Examples:
+     * - "@alice:domain.org".getDomain() will return "domain.org"
+     * - "@bob:domain.org:3455".getDomain() will return "domain.org:3455"
+     */
+    fun String.getDomain(): String {
+        if (BuildConfig.DEBUG && !isUserId(this)) {
+            // They are some invalid userId localpart in the wild, but the domain part should be there anyway
+            Timber.w("Not a valid user ID: $this")
         }
+        return substringAfter(":")
     }
 }

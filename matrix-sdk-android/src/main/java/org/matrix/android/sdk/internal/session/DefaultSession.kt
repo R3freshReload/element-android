@@ -22,6 +22,7 @@ import io.realm.RealmConfiguration
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import org.matrix.android.sdk.api.MatrixCoroutineDispatchers
 import org.matrix.android.sdk.api.auth.data.SessionParams
 import org.matrix.android.sdk.api.failure.GlobalError
 import org.matrix.android.sdk.api.federation.FederationService
@@ -40,11 +41,12 @@ import org.matrix.android.sdk.api.session.file.ContentDownloadStateTracker
 import org.matrix.android.sdk.api.session.file.FileService
 import org.matrix.android.sdk.api.session.group.GroupService
 import org.matrix.android.sdk.api.session.homeserver.HomeServerCapabilitiesService
-import org.matrix.android.sdk.api.session.initsync.InitialSyncProgressService
+import org.matrix.android.sdk.api.session.initsync.SyncStatusService
 import org.matrix.android.sdk.api.session.integrationmanager.IntegrationManagerService
 import org.matrix.android.sdk.api.session.media.MediaService
 import org.matrix.android.sdk.api.session.openid.OpenIdService
 import org.matrix.android.sdk.api.session.permalinks.PermalinkService
+import org.matrix.android.sdk.api.session.presence.PresenceService
 import org.matrix.android.sdk.api.session.profile.ProfileService
 import org.matrix.android.sdk.api.session.pushers.PushersService
 import org.matrix.android.sdk.api.session.room.RoomDirectoryService
@@ -86,6 +88,7 @@ internal class DefaultSession @Inject constructor(
         private val globalErrorHandler: GlobalErrorHandler,
         @SessionId
         override val sessionId: String,
+        override val coroutineDispatchers: MatrixCoroutineDispatchers,
         @SessionDatabase private val realmConfiguration: RealmConfiguration,
         private val lifecycleObservers: Set<@JvmSuppressWildcards SessionLifecycleObserver>,
         private val sessionListeners: SessionListeners,
@@ -115,7 +118,7 @@ internal class DefaultSession @Inject constructor(
         private val contentUploadProgressTracker: ContentUploadStateTracker,
         private val typingUsersTracker: TypingUsersTracker,
         private val contentDownloadStateTracker: ContentDownloadStateTracker,
-        private val initialSyncProgressService: Lazy<InitialSyncProgressService>,
+        private val syncStatusService: Lazy<SyncStatusService>,
         private val homeServerCapabilitiesService: Lazy<HomeServerCapabilitiesService>,
         private val accountDataService: Lazy<SessionAccountDataService>,
         private val _sharedSecretStorageService: Lazy<SharedSecretStorageService>,
@@ -127,6 +130,7 @@ internal class DefaultSession @Inject constructor(
         private val callSignalingService: Lazy<CallSignalingService>,
         private val spaceService: Lazy<SpaceService>,
         private val openIdService: Lazy<OpenIdService>,
+        private val presenceService: Lazy<PresenceService>,
         @UnauthenticatedWithCertificate
         private val unauthenticatedWithCertificateOkHttpClient: Lazy<OkHttpClient>
 ) : Session,
@@ -141,10 +145,11 @@ internal class DefaultSession @Inject constructor(
         PushersService by pushersService.get(),
         EventService by eventService.get(),
         TermsService by termsService.get(),
-        InitialSyncProgressService by initialSyncProgressService.get(),
+        SyncStatusService by syncStatusService.get(),
         SecureStorageService by secureStorageService.get(),
         HomeServerCapabilitiesService by homeServerCapabilitiesService.get(),
         ProfileService by profileService.get(),
+        PresenceService by presenceService.get(),
         AccountService by accountService.get() {
 
     override val sharedSecretStorageService: SharedSecretStorageService
@@ -222,6 +227,8 @@ internal class DefaultSession @Inject constructor(
     }
 
     override fun getSyncStateLive() = getSyncThread().liveState()
+
+    override fun syncFlow() = getSyncThread().syncFlow()
 
     override fun getSyncState() = getSyncThread().currentState()
 
@@ -313,7 +320,7 @@ internal class DefaultSession @Inject constructor(
 
     override fun getUiaSsoFallbackUrl(authenticationSessionId: String): String {
         val hsBas = sessionParams.homeServerConnectionConfig
-                .homeServerUri
+                .homeServerUriBase
                 .toString()
                 .trim { it == '/' }
         return buildString {

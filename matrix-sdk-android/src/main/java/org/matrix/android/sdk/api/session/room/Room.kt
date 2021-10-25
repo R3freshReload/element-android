@@ -17,6 +17,7 @@
 package org.matrix.android.sdk.api.session.room
 
 import androidx.lifecycle.LiveData
+import org.matrix.android.sdk.api.MatrixCoroutineDispatchers
 import org.matrix.android.sdk.api.session.room.accountdata.RoomAccountDataService
 import org.matrix.android.sdk.api.session.room.alias.AliasService
 import org.matrix.android.sdk.api.session.room.call.RoomCallService
@@ -34,6 +35,7 @@ import org.matrix.android.sdk.api.session.room.tags.TagsService
 import org.matrix.android.sdk.api.session.room.timeline.TimelineService
 import org.matrix.android.sdk.api.session.room.typing.TypingService
 import org.matrix.android.sdk.api.session.room.uploads.UploadsService
+import org.matrix.android.sdk.api.session.room.version.RoomVersionService
 import org.matrix.android.sdk.api.session.search.SearchResult
 import org.matrix.android.sdk.api.session.space.Space
 import org.matrix.android.sdk.api.util.Optional
@@ -57,7 +59,10 @@ interface Room :
         RelationService,
         RoomCryptoService,
         RoomPushRuleService,
-        RoomAccountDataService {
+        RoomAccountDataService,
+        RoomVersionService {
+
+    val coroutineDispatchers: MatrixCoroutineDispatchers
 
     /**
      * The roomId of this room

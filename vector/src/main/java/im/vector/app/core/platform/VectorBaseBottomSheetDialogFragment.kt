@@ -27,15 +27,14 @@ import android.widget.FrameLayout
 import androidx.annotation.CallSuper
 import androidx.lifecycle.ViewModelProvider
 import androidx.viewbinding.ViewBinding
-import com.airbnb.mvrx.MvRx
-import com.airbnb.mvrx.MvRxView
-import com.airbnb.mvrx.MvRxViewId
+import com.airbnb.mvrx.Mavericks
+import com.airbnb.mvrx.MavericksView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.jakewharton.rxbinding3.view.clicks
-import im.vector.app.core.di.DaggerScreenComponent
-import im.vector.app.core.di.ScreenComponent
+import dagger.hilt.android.EntryPointAccessors
+import im.vector.app.core.di.ActivityEntryPoint
 import im.vector.app.core.utils.DimensionConverter
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -44,13 +43,9 @@ import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 /**
- * Add MvRx capabilities to bottomsheetdialog (like BaseMvRxFragment)
+ * Add Mavericks capabilities, handle DI and bindings.
  */
-abstract class VectorBaseBottomSheetDialogFragment<VB: ViewBinding> : BottomSheetDialogFragment(), MvRxView {
-
-    private val mvrxViewIdProperty = MvRxViewId()
-    final override val mvrxViewId: String by mvrxViewIdProperty
-    private lateinit var screenComponent: ScreenComponent
+abstract class VectorBaseBottomSheetDialogFragment<VB : ViewBinding> : BottomSheetDialogFragment(), MavericksView {
 
     /* ==========================================================================================
      * View
@@ -125,17 +120,9 @@ abstract class VectorBaseBottomSheetDialogFragment<VB: ViewBinding> : BottomShee
     }
 
     override fun onAttach(context: Context) {
-        screenComponent = DaggerScreenComponent.factory().create(vectorBaseActivity.getVectorComponent(), vectorBaseActivity)
-        viewModelFactory = screenComponent.viewModelFactory()
+        val activityEntryPoint = EntryPointAccessors.fromActivity(vectorBaseActivity, ActivityEntryPoint::class.java)
+        viewModelFactory = activityEntryPoint.viewModelFactory()
         super.onAttach(context)
-        injectWith(screenComponent)
-    }
-
-    protected open fun injectWith(injector: ScreenComponent) = Unit
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        mvrxViewIdProperty.restoreFrom(savedInstanceState)
-        super.onCreate(savedInstanceState)
     }
 
     override fun onResume() {
@@ -154,11 +141,6 @@ abstract class VectorBaseBottomSheetDialogFragment<VB: ViewBinding> : BottomShee
         }
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        mvrxViewIdProperty.saveTo(outState)
-    }
-
     override fun onStart() {
         super.onStart()
         // This ensures that invalidate() is called for static screens that don't
@@ -168,6 +150,10 @@ abstract class VectorBaseBottomSheetDialogFragment<VB: ViewBinding> : BottomShee
 
     @CallSuper
     override fun invalidate() {
+        forceExpandState()
+    }
+
+    protected fun forceExpandState() {
         if (showExpanded) {
             // Force the bottom sheet to be expanded
             bottomSheetBehavior?.state = BottomSheetBehavior.STATE_EXPANDED
@@ -175,7 +161,7 @@ abstract class VectorBaseBottomSheetDialogFragment<VB: ViewBinding> : BottomShee
     }
 
     protected fun setArguments(args: Parcelable? = null) {
-        arguments = args?.let { Bundle().apply { putParcelable(MvRx.KEY_ARG, it) } }
+        arguments = args?.let { Bundle().apply { putParcelable(Mavericks.KEY_ARG, it) } }
     }
 
     /* ==========================================================================================

@@ -31,8 +31,8 @@ private const val RIOT_BOT_ID = "@riot-bot:matrix.org"
  */
 class ConsentWebViewEventListener(activity: VectorBaseActivity<*>,
                                   private val session: Session,
-                                  private val delegate: WebViewEventListener)
-    : WebViewEventListener by delegate {
+                                  private val delegate: WebViewEventListener) :
+    WebViewEventListener by delegate {
 
     private val safeActivity: VectorBaseActivity<*>? by weak(activity)
 
@@ -58,7 +58,7 @@ class ConsentWebViewEventListener(activity: VectorBaseActivity<*>,
                 session.profileApiClient
                         .displayname(RIOT_BOT_ID, object : MatrixCallback<String>(createRiotBotRoomCallback) {
                             override fun onSuccess(info: String?) {
-                                // Ok, the Home Server knows riot-Bot, so create a Room with him
+                                // Ok, the homeserver knows riot-Bot, so create a Room with him
                                 session.createDirectMessageRoom(RIOT_BOT_ID, createRiotBotRoomCallback)
                             }
                         })

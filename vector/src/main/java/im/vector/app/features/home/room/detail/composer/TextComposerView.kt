@@ -24,14 +24,13 @@ import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.text.toSpannable
-import androidx.core.view.isVisible
-import androidx.transition.AutoTransition
 import androidx.transition.ChangeBounds
 import androidx.transition.Fade
 import androidx.transition.Transition
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import im.vector.app.R
+import im.vector.app.core.extensions.setTextIfDifferent
 import im.vector.app.databinding.ComposerLayoutBinding
 
 /**
@@ -70,17 +69,8 @@ class TextComposerView @JvmOverloads constructor(
                 return callback?.onRichContentSelected(contentUri) ?: false
             }
 
-            override fun onTextBlankStateChanged(isBlank: Boolean) {
-                callback?.onTextBlankStateChanged(isBlank)
-                val shouldBeVisible = currentConstraintSetId == R.layout.composer_layout_constraint_set_expanded || !isBlank
-                TransitionManager.endTransitions(this@TextComposerView)
-                if (views.sendButton.isVisible != shouldBeVisible) {
-                    TransitionManager.beginDelayedTransition(
-                            this@TextComposerView,
-                            AutoTransition().also { it.duration = 150 }
-                    )
-                    views.sendButton.isVisible = shouldBeVisible
-                }
+            override fun onTextChanged(text: CharSequence) {
+                callback?.onTextChanged(text)
             }
         }
         views.composerRelatedMessageCloseButton.setOnClickListener {
@@ -105,7 +95,6 @@ class TextComposerView @JvmOverloads constructor(
         }
         currentConstraintSetId = R.layout.composer_layout_constraint_set_compact
         applyNewConstraintSet(animate, transitionComplete)
-        views.sendButton.isVisible = !views.composerEditText.text.isNullOrEmpty()
     }
 
     fun expand(animate: Boolean = true, transitionComplete: (() -> Unit)? = null) {
@@ -115,10 +104,14 @@ class TextComposerView @JvmOverloads constructor(
         }
         currentConstraintSetId = R.layout.composer_layout_constraint_set_expanded
         applyNewConstraintSet(animate, transitionComplete)
-        views.sendButton.isVisible = true
+    }
+
+    fun setTextIfDifferent(text: CharSequence?): Boolean {
+        return views.composerEditText.setTextIfDifferent(text)
     }
 
     private fun applyNewConstraintSet(animate: Boolean, transitionComplete: (() -> Unit)?) {
+        // val wasSendButtonInvisible = views.sendButton.isInvisible
         if (animate) {
             configureAndBeginTransition(transitionComplete)
         }
@@ -126,6 +119,8 @@ class TextComposerView @JvmOverloads constructor(
             it.clone(context, currentConstraintSetId)
             it.applyTo(this)
         }
+        // Might be updated by view state just after, but avoid blinks
+        // views.sendButton.isInvisible = wasSendButtonInvisible
     }
 
     private fun configureAndBeginTransition(transitionComplete: (() -> Unit)? = null) {

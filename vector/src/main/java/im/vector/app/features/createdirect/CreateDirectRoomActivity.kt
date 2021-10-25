@@ -28,8 +28,8 @@ import com.airbnb.mvrx.Loading
 import com.airbnb.mvrx.Success
 import com.airbnb.mvrx.viewModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dagger.hilt.android.AndroidEntryPoint
 import im.vector.app.R
-import im.vector.app.core.di.ScreenComponent
 import im.vector.app.core.error.ErrorFormatter
 import im.vector.app.core.extensions.addFragment
 import im.vector.app.core.extensions.addFragmentToBackstack
@@ -38,45 +38,25 @@ import im.vector.app.core.platform.SimpleFragmentActivity
 import im.vector.app.core.platform.WaitingViewData
 import im.vector.app.core.utils.PERMISSIONS_FOR_MEMBERS_SEARCH
 import im.vector.app.core.utils.PERMISSIONS_FOR_TAKING_PHOTO
-import im.vector.app.core.utils.PERMISSION_REQUEST_CODE_LAUNCH_CAMERA
-import im.vector.app.core.utils.PERMISSION_REQUEST_CODE_READ_CONTACTS
-import im.vector.app.core.utils.allGranted
 import im.vector.app.core.utils.checkPermissions
 import im.vector.app.core.utils.onPermissionDeniedSnackbar
+import im.vector.app.core.utils.registerForPermissionsResult
 import im.vector.app.features.contactsbook.ContactsBookFragment
-import im.vector.app.features.contactsbook.ContactsBookViewModel
-import im.vector.app.features.contactsbook.ContactsBookViewState
 import im.vector.app.features.userdirectory.UserListFragment
 import im.vector.app.features.userdirectory.UserListFragmentArgs
 import im.vector.app.features.userdirectory.UserListSharedAction
 import im.vector.app.features.userdirectory.UserListSharedActionViewModel
-import im.vector.app.features.userdirectory.UserListViewModel
-import im.vector.app.features.userdirectory.UserListViewState
-
 import org.matrix.android.sdk.api.failure.Failure
 import org.matrix.android.sdk.api.session.room.failure.CreateRoomFailure
 import java.net.HttpURLConnection
 import javax.inject.Inject
 
-class CreateDirectRoomActivity : SimpleFragmentActivity(), UserListViewModel.Factory, CreateDirectRoomViewModel.Factory, ContactsBookViewModel.Factory {
+@AndroidEntryPoint
+class CreateDirectRoomActivity : SimpleFragmentActivity() {
 
     private val viewModel: CreateDirectRoomViewModel by viewModel()
     private lateinit var sharedActionViewModel: UserListSharedActionViewModel
-    @Inject lateinit var userListViewModelFactory: UserListViewModel.Factory
-    @Inject lateinit var createDirectRoomViewModelFactory: CreateDirectRoomViewModel.Factory
-    @Inject lateinit var contactsBookViewModelFactory: ContactsBookViewModel.Factory
     @Inject lateinit var errorFormatter: ErrorFormatter
-
-    override fun injectWith(injector: ScreenComponent) {
-        super.injectWith(injector)
-        injector.inject(this)
-    }
-
-    override fun create(initialState: UserListViewState) = userListViewModelFactory.create(initialState)
-
-    override fun create(initialState: CreateDirectRoomViewState) = createDirectRoomViewModelFactory.create(initialState)
-
-    override fun create(initialState: ContactsBookViewState) = contactsBookViewModelFactory.create(initialState)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,50 +85,43 @@ class CreateDirectRoomActivity : SimpleFragmentActivity(), UserListViewModel.Fac
                     )
             )
         }
-        viewModel.selectSubscribe(this, CreateDirectRoomViewState::createAndInviteState) {
+        viewModel.onEach(CreateDirectRoomViewState::createAndInviteState) {
             renderCreateAndInviteState(it)
         }
     }
 
     private fun openAddByQrCode() {
-        if (checkPermissions(PERMISSIONS_FOR_TAKING_PHOTO, this, PERMISSION_REQUEST_CODE_LAUNCH_CAMERA, 0)) {
+        if (checkPermissions(PERMISSIONS_FOR_TAKING_PHOTO, this, permissionCameraLauncher)) {
             addFragment(R.id.container, CreateDirectRoomByQrCodeFragment::class.java)
         }
     }
 
     private fun openPhoneBook() {
         // Check permission first
-        if (checkPermissions(PERMISSIONS_FOR_MEMBERS_SEARCH,
-                        this,
-                        PERMISSION_REQUEST_CODE_READ_CONTACTS,
-                        0)) {
+        if (checkPermissions(PERMISSIONS_FOR_MEMBERS_SEARCH, this, permissionReadContactLauncher)) {
             addFragmentToBackstack(R.id.container, ContactsBookFragment::class.java)
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (allGranted(grantResults)) {
-            if (requestCode == PERMISSION_REQUEST_CODE_READ_CONTACTS) {
-                doOnPostResume { addFragmentToBackstack(R.id.container, ContactsBookFragment::class.java) }
-            } else if (requestCode == PERMISSION_REQUEST_CODE_LAUNCH_CAMERA) {
-                addFragment(R.id.container, CreateDirectRoomByQrCodeFragment::class.java)
-            }
-        } else {
-            if (requestCode == PERMISSION_REQUEST_CODE_LAUNCH_CAMERA) {
-                onPermissionDeniedSnackbar(R.string.permissions_denied_qr_code)
-            } else if (requestCode == PERMISSION_REQUEST_CODE_READ_CONTACTS) {
-                onPermissionDeniedSnackbar(R.string.permissions_denied_add_contact)
-            }
+    private val permissionReadContactLauncher = registerForPermissionsResult { allGranted, deniedPermanently ->
+        if (allGranted) {
+            doOnPostResume { addFragmentToBackstack(R.id.container, ContactsBookFragment::class.java) }
+        } else if (deniedPermanently) {
+            onPermissionDeniedSnackbar(R.string.permissions_denied_add_contact)
+        }
+    }
+
+    private val permissionCameraLauncher = registerForPermissionsResult { allGranted, deniedPermanently ->
+        if (allGranted) {
+            addFragment(R.id.container, CreateDirectRoomByQrCodeFragment::class.java)
+        } else if (deniedPermanently) {
+            onPermissionDeniedSnackbar(R.string.permissions_denied_qr_code)
         }
     }
 
     private fun onMenuItemSelected(action: UserListSharedAction.OnMenuItemSelected) {
         if (action.itemId == R.id.action_create_direct_room) {
-            viewModel.handle(CreateDirectRoomAction.CreateRoomAndInviteSelectedUsers(
-                    action.selections,
-                    null
-            ))
+            viewModel.handle(CreateDirectRoomAction.CreateRoomAndInviteSelectedUsers(action.selections))
         }
     }
 

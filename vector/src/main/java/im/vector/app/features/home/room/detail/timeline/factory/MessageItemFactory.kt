@@ -25,6 +25,7 @@ import android.text.style.ForegroundColorSpan
 import android.view.View
 import dagger.Lazy
 import im.vector.app.R
+import im.vector.app.core.epoxy.ClickListener
 import im.vector.app.core.epoxy.VectorEpoxyModel
 import im.vector.app.core.files.LocalFilesHelper
 import im.vector.app.core.resources.ColorProvider
@@ -38,6 +39,7 @@ import im.vector.app.features.home.room.detail.timeline.helper.ContentUploadStat
 import im.vector.app.features.home.room.detail.timeline.helper.MessageInformationDataFactory
 import im.vector.app.features.home.room.detail.timeline.helper.MessageItemAttributesFactory
 import im.vector.app.features.home.room.detail.timeline.helper.TimelineMediaSizeProvider
+import im.vector.app.features.home.room.detail.timeline.helper.VoiceMessagePlaybackTracker
 import im.vector.app.features.home.room.detail.timeline.item.AbsMessageItem
 import im.vector.app.features.home.room.detail.timeline.item.MessageBlockCodeItem
 import im.vector.app.features.home.room.detail.timeline.item.MessageBlockCodeItem_
@@ -50,6 +52,8 @@ import im.vector.app.features.home.room.detail.timeline.item.MessageOptionsItem_
 import im.vector.app.features.home.room.detail.timeline.item.MessagePollItem_
 import im.vector.app.features.home.room.detail.timeline.item.MessageTextItem
 import im.vector.app.features.home.room.detail.timeline.item.MessageTextItem_
+import im.vector.app.features.home.room.detail.timeline.item.MessageVoiceItem
+import im.vector.app.features.home.room.detail.timeline.item.MessageVoiceItem_
 import im.vector.app.features.home.room.detail.timeline.item.RedactedMessageItem
 import im.vector.app.features.home.room.detail.timeline.item.RedactedMessageItem_
 import im.vector.app.features.home.room.detail.timeline.item.VerificationRequestItem
@@ -65,6 +69,7 @@ import im.vector.app.features.media.ImageContentRenderer
 import im.vector.app.features.media.VideoContentRenderer
 import me.gujun.android.span.span
 import org.commonmark.node.Document
+import org.matrix.android.sdk.api.MatrixUrls.isMxcUrl
 import org.matrix.android.sdk.api.session.Session
 import org.matrix.android.sdk.api.session.events.model.RelationType
 import org.matrix.android.sdk.api.session.events.model.toModel
@@ -110,7 +115,8 @@ class MessageItemFactory @Inject constructor(
         private val avatarSizeProvider: AvatarSizeProvider,
         private val pillsPostProcessorFactory: PillsPostProcessor.Factory,
         private val spanUtils: SpanUtils,
-        private val session: Session) {
+        private val session: Session,
+        private val voiceMessagePlaybackTracker: VoiceMessagePlaybackTracker) {
 
     // TODO inject this properly?
     private var roomId: String = ""
@@ -137,8 +143,8 @@ class MessageItemFactory @Inject constructor(
             val malformedText = stringProvider.getString(R.string.malformed_message)
             return defaultItemFactory.create(malformedText, informationData, highlight, callback)
         }
-        if (messageContent.relatesTo?.type == RelationType.REPLACE
-                || event.isEncrypted() && event.root.content.toModel<EncryptedEventContent>()?.relatesTo?.type == RelationType.REPLACE
+        if (messageContent.relatesTo?.type == RelationType.REPLACE ||
+                event.isEncrypted() && event.root.content.toModel<EncryptedEventContent>()?.relatesTo?.type == RelationType.REPLACE
         ) {
             // This is an edit event, we should display it when debugging as a notice event
             return noticeItemFactory.create(params)
@@ -154,7 +160,13 @@ class MessageItemFactory @Inject constructor(
             is MessageNoticeContent              -> buildNoticeMessageItem(messageContent, informationData, highlight, callback, attributes)
             is MessageVideoContent               -> buildVideoMessageItem(messageContent, informationData, highlight, callback, attributes)
             is MessageFileContent                -> buildFileMessageItem(messageContent, highlight, attributes)
-            is MessageAudioContent               -> buildAudioMessageItem(messageContent, informationData, highlight, attributes)
+            is MessageAudioContent               -> {
+                if (messageContent.voiceMessageIndicator != null) {
+                    buildVoiceMessageItem(params, messageContent, informationData, highlight, attributes)
+                } else {
+                    buildAudioMessageItem(messageContent, informationData, highlight, attributes)
+                }
+            }
             is MessageVerificationRequestContent -> buildVerificationRequestMessageItem(messageContent, informationData, highlight, callback, attributes)
             is MessageOptionsContent             -> buildOptionsMessageItem(messageContent, informationData, highlight, callback, attributes)
             is MessagePollResponseContent        -> noticeItemFactory.create(params)
@@ -202,7 +214,7 @@ class MessageItemFactory @Inject constructor(
             if (informationData.sentByMe && !informationData.sendState.isSent()) {
                 it
             } else {
-                it.takeIf { it.startsWith("mxc://") }
+                it.takeIf { it.isMxcUrl() }
             }
         } ?: ""
         return MessageFileItem_()
@@ -221,6 +233,46 @@ class MessageItemFactory @Inject constructor(
                 .leftGuideline(avatarSizeProvider.leftGuideline)
                 .filename(messageContent.body)
                 .iconRes(R.drawable.ic_headphones)
+    }
+
+    private fun buildVoiceMessageItem(params: TimelineItemFactoryParams,
+                                      messageContent: MessageAudioContent,
+                                      @Suppress("UNUSED_PARAMETER")
+                                      informationData: MessageInformationData,
+                                      highlight: Boolean,
+                                      attributes: AbsMessageItem.Attributes): MessageVoiceItem? {
+        val fileUrl = messageContent.getFileUrl()?.let {
+            if (informationData.sentByMe && !informationData.sendState.isSent()) {
+                it
+            } else {
+                it.takeIf { it.isMxcUrl() }
+            }
+        } ?: ""
+
+        val playbackControlButtonClickListener: ClickListener = object : ClickListener {
+            override fun invoke(view: View) {
+                params.callback?.onVoiceControlButtonClicked(informationData.eventId, messageContent)
+            }
+        }
+
+        return MessageVoiceItem_()
+                .attributes(attributes)
+                .duration(messageContent.audioWaveformInfo?.duration ?: 0)
+                .waveform(messageContent.audioWaveformInfo?.waveform?.toFft().orEmpty())
+                .playbackControlButtonClickListener(playbackControlButtonClickListener)
+                .voiceMessagePlaybackTracker(voiceMessagePlaybackTracker)
+                .izLocalFile(localFilesHelper.isLocalFile(fileUrl))
+                .izDownloaded(session.fileService().isFileInCache(
+                        fileUrl,
+                        messageContent.getFileName(),
+                        messageContent.mimeType,
+                        messageContent.encryptedFileInfo?.toElementToDecrypt())
+                )
+                .mxcUrl(fileUrl)
+                .contentUploadStateTrackerBinder(contentUploadStateTrackerBinder)
+                .contentDownloadStateTrackerBinder(contentDownloadStateTrackerBinder)
+                .highlighted(highlight)
+                .leftGuideline(avatarSizeProvider.leftGuideline)
     }
 
     private fun buildVerificationRequestMessageItem(messageContent: MessageVerificationRequestContent,
@@ -314,7 +366,7 @@ class MessageItemFactory @Inject constructor(
                 .leftGuideline(avatarSizeProvider.leftGuideline)
                 .imageContentRenderer(imageContentRenderer)
                 .contentUploadStateTrackerBinder(contentUploadStateTrackerBinder)
-                .playable(messageContent.info?.mimeType == MimeTypes.Gif)
+                .playable(messageContent.mimeType == MimeTypes.Gif)
                 .highlighted(highlight)
                 .mediaData(data)
                 .apply {
@@ -569,6 +621,15 @@ class MessageItemFactory @Inject constructor(
                 .leftGuideline(avatarSizeProvider.leftGuideline)
                 .attributes(attributes)
                 .highlighted(highlight)
+    }
+
+    private fun List<Int?>?.toFft(): List<Int>? {
+        return this
+                ?.filterNotNull()
+                ?.map {
+                    // Value comes from AudioRecordView.maxReportableAmp, and 1024 is the max value in the Matrix spec
+                    it * 22760 / 1024
+                }
     }
 
     companion object {

@@ -17,6 +17,9 @@
 package org.matrix.android.sdk.internal.legacy
 
 import android.content.Context
+import io.realm.Realm
+import io.realm.RealmConfiguration
+import kotlinx.coroutines.runBlocking
 import org.matrix.android.sdk.api.auth.data.Credentials
 import org.matrix.android.sdk.api.auth.data.DiscoveryInformation
 import org.matrix.android.sdk.api.auth.data.HomeServerConnectionConfig
@@ -30,9 +33,6 @@ import org.matrix.android.sdk.internal.database.RealmKeysUtils
 import org.matrix.android.sdk.internal.legacy.riot.LoginStorage
 import org.matrix.android.sdk.internal.network.ssl.Fingerprint
 import org.matrix.android.sdk.internal.util.md5
-import io.realm.Realm
-import io.realm.RealmConfiguration
-import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -42,7 +42,6 @@ import org.matrix.android.sdk.internal.legacy.riot.HomeServerConnectionConfig as
 internal class DefaultLegacySessionImporter @Inject constructor(
         private val context: Context,
         private val sessionParamsStore: SessionParamsStore,
-        private val realmCryptoStoreMigration: RealmCryptoStoreMigration,
         private val realmKeysUtils: RealmKeysUtils
 ) : LegacySessionImporter {
 
@@ -172,7 +171,7 @@ internal class DefaultLegacySessionImporter @Inject constructor(
                 .name("crypto_store.realm")
                 .modules(RealmCryptoStoreModule())
                 .schemaVersion(RealmCryptoStoreMigration.CRYPTO_STORE_SCHEMA_VERSION)
-                .migration(realmCryptoStoreMigration)
+                .migration(RealmCryptoStoreMigration)
                 .build()
 
         Timber.d("Migration: copy DB to encrypted DB")

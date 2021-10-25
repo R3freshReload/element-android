@@ -17,6 +17,7 @@
 package org.matrix.android.sdk.internal.session.room
 
 import androidx.lifecycle.LiveData
+import org.matrix.android.sdk.api.MatrixCoroutineDispatchers
 import org.matrix.android.sdk.api.session.crypto.CryptoService
 import org.matrix.android.sdk.api.session.events.model.EventType
 import org.matrix.android.sdk.api.session.room.Room
@@ -37,6 +38,7 @@ import org.matrix.android.sdk.api.session.room.tags.TagsService
 import org.matrix.android.sdk.api.session.room.timeline.TimelineService
 import org.matrix.android.sdk.api.session.room.typing.TypingService
 import org.matrix.android.sdk.api.session.room.uploads.UploadsService
+import org.matrix.android.sdk.api.session.room.version.RoomVersionService
 import org.matrix.android.sdk.api.session.search.SearchResult
 import org.matrix.android.sdk.api.session.space.Space
 import org.matrix.android.sdk.api.util.Optional
@@ -67,9 +69,12 @@ internal class DefaultRoom(override val roomId: String,
                            private val roomMembersService: MembershipService,
                            private val roomPushRuleService: RoomPushRuleService,
                            private val roomAccountDataService: RoomAccountDataService,
+                           private val roomVersionService: RoomVersionService,
                            private val sendStateTask: SendStateTask,
                            private val viaParameterFinder: ViaParameterFinder,
-                           private val searchTask: SearchTask) :
+                           private val searchTask: SearchTask,
+                           override val coroutineDispatchers: MatrixCoroutineDispatchers
+) :
         Room,
         TimelineService by timelineService,
         SendService by sendService,
@@ -85,7 +90,8 @@ internal class DefaultRoom(override val roomId: String,
         RelationService by relationService,
         MembershipService by roomMembersService,
         RoomPushRuleService by roomPushRuleService,
-        RoomAccountDataService by roomAccountDataService {
+        RoomAccountDataService by roomAccountDataService,
+        RoomVersionService by roomVersionService {
 
     override fun getRoomSummaryLive(): LiveData<Optional<RoomSummary>> {
         return roomSummaryDataSource.getRoomSummaryLive(roomId)

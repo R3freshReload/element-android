@@ -22,7 +22,9 @@ import im.vector.app.core.epoxy.helpFooterItem
 import im.vector.app.core.resources.StringProvider
 import im.vector.app.core.resources.UserPreferencesProvider
 import im.vector.app.features.home.RoomListDisplayMode
+import im.vector.app.features.home.room.filtered.FilteredRoomFooterItem
 import im.vector.app.features.home.room.filtered.filteredRoomFooterItem
+import im.vector.app.space
 import javax.inject.Inject
 
 class RoomListFooterController @Inject constructor(
@@ -30,7 +32,7 @@ class RoomListFooterController @Inject constructor(
         private val userPreferencesProvider: UserPreferencesProvider
 ) : TypedEpoxyController<RoomListViewState>() {
 
-    var listener: RoomListListener? = null
+    var listener: FilteredRoomFooterItem.Listener? = null
 
     override fun buildModels(data: RoomListViewState?) {
         val host = this
@@ -40,6 +42,7 @@ class RoomListFooterController @Inject constructor(
                     id("filter_footer")
                     listener(host.listener)
                     currentFilter(data.roomFilter)
+                    inSpace(data.currentRoomGrouping.invoke()?.space() != null)
                 }
             }
             else                         -> {

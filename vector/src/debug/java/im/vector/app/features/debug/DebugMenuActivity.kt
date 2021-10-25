@@ -24,15 +24,14 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.getSystemService
+import dagger.hilt.android.AndroidEntryPoint
 import im.vector.app.R
 import im.vector.app.core.di.ActiveSessionHolder
-import im.vector.app.core.di.ScreenComponent
 import im.vector.app.core.extensions.registerStartForActivityResult
 import im.vector.app.core.platform.VectorBaseActivity
 import im.vector.app.core.utils.PERMISSIONS_FOR_TAKING_PHOTO
-import im.vector.app.core.utils.PERMISSION_REQUEST_CODE_LAUNCH_CAMERA
-import im.vector.app.core.utils.allGranted
 import im.vector.app.core.utils.checkPermissions
+import im.vector.app.core.utils.registerForPermissionsResult
 import im.vector.app.core.utils.toast
 import im.vector.app.databinding.ActivityDebugMenuBinding
 import im.vector.app.features.debug.sas.DebugSasEmojiActivity
@@ -48,20 +47,16 @@ import im.vector.lib.ui.styles.debug.DebugVectorButtonStylesLightActivity
 import im.vector.lib.ui.styles.debug.DebugVectorTextViewDarkActivity
 import im.vector.lib.ui.styles.debug.DebugVectorTextViewLightActivity
 import org.matrix.android.sdk.internal.crypto.verification.qrcode.toQrCodeData
-
 import timber.log.Timber
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class DebugMenuActivity : VectorBaseActivity<ActivityDebugMenuBinding>() {
 
     override fun getBinding() = ActivityDebugMenuBinding.inflate(layoutInflater)
 
     @Inject
     lateinit var activeSessionHolder: ActiveSessionHolder
-
-    override fun injectWith(injector: ScreenComponent) {
-        injector.inject(this)
-    }
 
     private lateinit var buffer: ByteArray
 
@@ -115,6 +110,9 @@ class DebugMenuActivity : VectorBaseActivity<ActivityDebugMenuBinding>() {
         }
         views.debugTestCrash.setOnClickListener { testCrash() }
         views.debugScanQrCode.setOnClickListener { scanQRCode() }
+        views.debugPermission.setOnClickListener {
+            startActivity(Intent(this, DebugPermissionActivity::class.java))
+        }
     }
 
     private fun renderQrCode(text: String) {
@@ -217,15 +215,13 @@ class DebugMenuActivity : VectorBaseActivity<ActivityDebugMenuBinding>() {
     }
 
     private fun scanQRCode() {
-        if (checkPermissions(PERMISSIONS_FOR_TAKING_PHOTO, this, PERMISSION_REQUEST_CODE_LAUNCH_CAMERA)) {
+        if (checkPermissions(PERMISSIONS_FOR_TAKING_PHOTO, this, permissionCameraLauncher)) {
             doScanQRCode()
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == PERMISSION_REQUEST_CODE_LAUNCH_CAMERA && allGranted(grantResults)) {
+    private val permissionCameraLauncher = registerForPermissionsResult { allGranted, _ ->
+        if (allGranted) {
             doScanQRCode()
         }
     }
@@ -236,8 +232,8 @@ class DebugMenuActivity : VectorBaseActivity<ActivityDebugMenuBinding>() {
 
     private val qrStartForActivityResult = registerStartForActivityResult { activityResult ->
         if (activityResult.resultCode == Activity.RESULT_OK) {
-            toast("QrCode: " + QrCodeScannerActivity.getResultText(activityResult.data)
-                    + " is QRCode: " + QrCodeScannerActivity.getResultIsQrCode(activityResult.data))
+            toast("QrCode: " + QrCodeScannerActivity.getResultText(activityResult.data) +
+                    " is QRCode: " + QrCodeScannerActivity.getResultIsQrCode(activityResult.data))
 
             // Also update the current QR Code (reverse operation)
             // renderQrCode(QrCodeScannerActivity.getResultText(data) ?: "")

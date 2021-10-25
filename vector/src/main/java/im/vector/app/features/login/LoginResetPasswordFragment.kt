@@ -27,13 +27,12 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jakewharton.rxbinding3.widget.textChanges
 import im.vector.app.R
 import im.vector.app.core.extensions.hideKeyboard
-import im.vector.app.core.extensions.isEmail
 import im.vector.app.core.extensions.hidePassword
+import im.vector.app.core.extensions.isEmail
 import im.vector.app.core.extensions.toReducedUrl
 import im.vector.app.databinding.FragmentLoginResetPasswordBinding
 import io.reactivex.Observable
 import io.reactivex.rxkotlin.subscribeBy
-
 import javax.inject.Inject
 
 /**
@@ -55,7 +54,7 @@ class LoginResetPasswordFragment @Inject constructor() : AbstractLoginFragment<F
     }
 
     private fun setupUi(state: LoginViewState) {
-        views.resetPasswordTitle.text = getString(R.string.login_reset_password_on, state.homeServerUrl.toReducedUrl())
+        views.resetPasswordTitle.text = getString(R.string.login_reset_password_on, state.homeServerUrlFromUser.toReducedUrl())
     }
 
     private fun setupSubmitButton() {

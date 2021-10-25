@@ -22,6 +22,7 @@ import org.matrix.android.sdk.api.session.room.model.SpaceChildInfo
 import org.matrix.android.sdk.api.session.room.model.SpaceParentInfo
 import org.matrix.android.sdk.api.session.room.model.tag.RoomTag
 import org.matrix.android.sdk.internal.database.model.RoomSummaryEntity
+import org.matrix.android.sdk.internal.database.model.presence.toUserPresence
 import org.matrix.android.sdk.internal.session.typing.DefaultTypingUsersTracker
 import javax.inject.Inject
 
@@ -48,6 +49,7 @@ internal class RoomSummaryMapper @Inject constructor(private val timelineEventMa
                 joinRules = roomSummaryEntity.joinRules,
                 isDirect = roomSummaryEntity.isDirect,
                 directUserId = roomSummaryEntity.directUserId,
+                directUserPresence = roomSummaryEntity.directUserPresence?.toUserPresence(),
                 latestPreviewableEvent = latestEvent,
                 joinedMembersCount = roomSummaryEntity.joinedMembersCount,
                 invitedMembersCount = roomSummaryEntity.invitedMembersCount,
@@ -88,7 +90,7 @@ internal class RoomSummaryMapper @Inject constructor(private val timelineEventMa
                             avatarUrl = it.childSummaryEntity?.avatarUrl,
                             activeMemberCount = it.childSummaryEntity?.joinedMembersCount,
                             order = it.order,
-                            autoJoin = it.autoJoin ?: false,
+//                            autoJoin = it.autoJoin ?: false,
                             viaServers = it.viaServers.toList(),
                             parentRoomId = roomSummaryEntity.roomId,
                             suggested = it.suggested,
